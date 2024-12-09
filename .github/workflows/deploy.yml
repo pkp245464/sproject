@@ -1,0 +1,52 @@
+name: Deploy Spring Boot Application to AWS EC2
+
+on:
+  push:
+    branches:
+      - main  # Trigger the deployment on push to the main branch
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Check out the code from GitHub
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # Step 2: Set up Java (OpenJDK 21) for building the Spring Boot app
+      - name: Set up JDK 21
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      # Step 3: Build the Spring Boot app using Maven or Gradle
+      - name: Build with Maven
+        run: mvn clean install -DskipTests
+
+      # Step 4: Upload to AWS EC2
+      - name: Deploy to EC2 via SSH
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+          EC2_PRIVATE_KEY: ${{ secrets.EC2_PRIVATE_KEY }}
+        run: |
+          # Create a temporary file to store the private key
+          echo "${{ secrets.EC2_PRIVATE_KEY }}" > ec2-private-key.pem
+          chmod 600 ec2-private-key.pem
+          
+          # Copy the Spring Boot jar to EC2 instance
+          scp -i ec2-private-key.pem target/*.jar $EC2_USER@$EC2_HOST:/home/$EC2_USER/
+
+          # SSH into EC2 and start the application
+          ssh -i ec2-private-key.pem $EC2_USER@$EC2_HOST << EOF
+            # Stop any running instance of the app
+            pkill -f 'java -jar'
+
+            # Run the new Spring Boot application (adjust the path to your .jar)
+            nohup java -jar /home/$EC2_USER/*.jar > /home/$EC2_USER/app.log 2>&1 &
+          EOF
+
+          # Clean up the private key
+          rm ec2-private-key.pem
