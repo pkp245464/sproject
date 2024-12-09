@@ -41,6 +41,8 @@ jobs:
 
           # SSH into EC2 and start the application
           ssh -i ec2-private-key.pem $EC2_USER@$EC2_HOST << EOF
+          ssh-keyscan -H 13.203.76.160 >> ~/.ssh/known_hosts
+
             # Stop any running instance of the app
             pkill -f 'java -jar'
 
